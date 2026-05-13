@@ -71,7 +71,7 @@ BEGIN
             ON dc.customer_id = o.customer_id
 
         LEFT JOIN mart.dim_payment_type pt
-            ON pt.payment_type_name = p.payment_type
+            ON pt.source_value = p.payment_type
 
         WHERE p.is_deleted = 0;
 

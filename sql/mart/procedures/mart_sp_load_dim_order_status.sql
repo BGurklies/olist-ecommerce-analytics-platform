@@ -35,19 +35,19 @@ BEGIN
         -- Keys 1–8 match the eight distinct values from the dataset.
         -- sort_order reflects the natural order lifecycle (created -> ... -> delivered).
         -- status_category groups statuses for funnel analysis
-        INSERT INTO mart.dim_order_status (order_status_key, status_name, status_category, sort_order)
-        SELECT v.order_status_key, v.status_name, v.status_category, v.sort_order
+        INSERT INTO mart.dim_order_status (order_status_key, status_name, status_category, sort_order, source_value)
+        SELECT v.order_status_key, v.status_name, v.status_category, v.sort_order, v.source_value
         FROM (VALUES
-            (-1, 'Unknown',     'Unknown',      0),
-            ( 1, 'Created',     'In Progress',  1),
-            ( 2, 'Approved',    'In Progress',  2),
-            ( 3, 'Invoiced',    'In Progress',  3),
-            ( 4, 'Processing',  'In Progress',  4),
-            ( 5, 'Shipped',     'In Progress',  5),
-            ( 6, 'Delivered',   'Completed',    6),
-            ( 7, 'Canceled',    'Canceled',     7),
-            ( 8, 'Unavailable', 'Canceled',     8)
-        ) AS v(order_status_key, status_name, status_category, sort_order)
+            (-1, 'UNKNOWN',     'UNKNOWN',      0, NULL),
+            ( 1, 'Created',     'In Progress',  1, 'created'),
+            ( 2, 'Approved',    'In Progress',  2, 'approved'),
+            ( 3, 'Invoiced',    'In Progress',  3, 'invoiced'),
+            ( 4, 'Processing',  'In Progress',  4, 'processing'),
+            ( 5, 'Shipped',     'In Progress',  5, 'shipped'),
+            ( 6, 'Delivered',   'Completed',    6, 'delivered'),
+            ( 7, 'Canceled',    'Canceled',     7, 'canceled'),
+            ( 8, 'Unavailable', 'Canceled',     8, 'unavailable')
+        ) AS v(order_status_key, status_name, status_category, sort_order, source_value)
         WHERE NOT EXISTS (
             SELECT 1 FROM mart.dim_order_status
             WHERE order_status_key = v.order_status_key

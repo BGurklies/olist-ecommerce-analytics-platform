@@ -33,16 +33,16 @@ BEGIN
         -- dim_payment_type has no IDENTITY column — INT PK allows explicit values.
         -- Key -1 = unknown member (fallback for unresolvable FK in fact_payments).
         -- Keys 1–5 match the five distinct values from the dataset.
-        INSERT INTO mart.dim_payment_type (payment_type_key, payment_type_name)
-        SELECT v.payment_type_key, v.payment_type_name
+        INSERT INTO mart.dim_payment_type (payment_type_key, payment_type_name, source_value)
+        SELECT v.payment_type_key, v.payment_type_name, v.source_value
         FROM (VALUES
-            (-1, 'UNKNOWN'),
-            ( 1, 'credit_card'),
-            ( 2, 'boleto'),
-            ( 3, 'voucher'),
-            ( 4, 'debit_card'),
-            ( 5, 'not_defined')
-        ) AS v(payment_type_key, payment_type_name)
+            (-1, 'UNKNOWN',      NULL),
+            ( 1, 'Credit Card',  'credit_card'),
+            ( 2, 'Boleto',       'boleto'),
+            ( 3, 'Voucher',      'voucher'),
+            ( 4, 'Debit Card',   'debit_card'),
+            ( 5, 'Not Defined',  'not_defined')
+        ) AS v(payment_type_key, payment_type_name, source_value)
         WHERE NOT EXISTS (
             SELECT 1 FROM mart.dim_payment_type
             WHERE payment_type_key = v.payment_type_key

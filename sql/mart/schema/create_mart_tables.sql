@@ -98,6 +98,7 @@ GO
 CREATE TABLE mart.dim_payment_type (
     payment_type_key    INT           NOT NULL,
     payment_type_name   NVARCHAR(25)  NOT NULL,
+    source_value        NVARCHAR(25)  NULL,
     CONSTRAINT PK_mart_dim_payment_type PRIMARY KEY (payment_type_key)
 );
 GO
@@ -109,6 +110,7 @@ CREATE TABLE mart.dim_order_status (
     status_name         NVARCHAR(25)  NOT NULL,
     status_category     NVARCHAR(25)  NOT NULL,  -- 'in_progress', 'completed', 'canceled', 'unknown'
     sort_order          TINYINT       NOT NULL,
+    source_value        NVARCHAR(25)  NULL,
     CONSTRAINT PK_mart_dim_order_status PRIMARY KEY (order_status_key)
 );
 GO

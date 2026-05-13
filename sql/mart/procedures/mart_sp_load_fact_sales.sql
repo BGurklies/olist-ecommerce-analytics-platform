@@ -165,7 +165,7 @@ BEGIN
             ON dp.product_id = oi.product_id
 
         LEFT JOIN mart.dim_order_status dos
-            ON dos.status_name = o.order_status
+            ON dos.source_value = o.order_status
 
         -- Review (latest per order, left join — not all orders have a review)
         LEFT JOIN latest_review r
