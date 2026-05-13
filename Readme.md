@@ -79,10 +79,12 @@ erDiagram
         nvarchar status_name
         nvarchar status_category
         tinyint sort_order
+        nvarchar source_value
     }
     dim_payment_type {
         int payment_type_key PK
         nvarchar payment_type_name
+        nvarchar source_value
     }
     fact_sales {
         bigint sales_key PK
@@ -146,6 +148,10 @@ erDiagram
 ### Page 3 — Delivery & Operations
 
 ![Delivery & Operations](docs/images/dashboard/page3_delivery_and_operations.png)
+
+### Page 4 — Customer & Payments
+
+![Customer & Payments](docs/images/dashboard/page4_customer_and_payments.png)
 
 DAX Measures: [`powerbi/te_create_measures.csx`](powerbi/te_create_measures.csx)
 
@@ -341,7 +347,7 @@ olist-ecommerce-dwh/
 | Power BI Reporting — Seite 1 (Executive Overview)        | Abgeschlossen  |
 | Power BI Reporting — Seite 2 (Sales & Product)           | Abgeschlossen  |
 | Power BI Reporting — Seite 3 (Delivery & Operations)     | Abgeschlossen  |
-| Power BI Reporting — Seite 4 (Customer & Payments)       | In Entwicklung |
+| Power BI Reporting — Seite 4 (Customer & Payments)       | Abgeschlossen  |
 
 ---
 
