@@ -265,7 +265,17 @@ Der SQL Server Agent Job (`agent_job_full_load.sql`) enthält zwei Steps: Prepro
 ```
 olist-ecommerce-dwh/
 ├── data/
+├── docs/
+│   └── images/
+│       ├── architecture/
+│       │   └── dwh_architecture.svg
+│       └── dashboard/
+│           ├── page1_executive_overview.png
+│           ├── page2_sales_and_product.png
+│           ├── page3_delivery_and_operations.png
+│           └── page4_customer_and_payments.png
 ├── powerbi/
+│   ├── olist_theme.json
 │   └── te_create_measures.csx
 ├── analysis/
 │   └── eda/
