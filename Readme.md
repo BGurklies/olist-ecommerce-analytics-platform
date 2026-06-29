@@ -1,10 +1,10 @@
 # Olist E-Commerce Analytics Platform
 
-End-to-End Data Warehouse und BI-Reporting auf Basis des öffentlichen [Olist Brazilian E-Commerce Datensatzes](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) — anonymisierte Echtdaten mit rund 100.000 Bestellungen aus der frühen Wachstumsphase (2016–2018).
+SQL Server Data Warehouse und Power BI Dashboard auf Basis des öffentlichen [Olist Brazilian E-Commerce Datensatzes](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce): anonymisierte Echtdaten mit rund 100.000 Bestellungen aus der frühen Wachstumsphase (2016–2018).
 
-Olist ist eine brasilianische SaaS-Plattform, die kleinen und mittelständischen Unternehmen die gleichzeitige Listung ihrer Produkte auf über 13 Marktplätzen (u.a. Mercado Livre, Amazon BR und B2W) ermöglicht — 2021 mit 1,5 Mrd. USD bewertet und damit eines der größten brasilianischen E-Commerce-Startups.
+Olist ist eine brasilianische SaaS-Plattform, die kleinen und mittelständischen Unternehmen die gleichzeitige Listung ihrer Produkte auf über 13 Marktplätzen (u.a. Mercado Livre, Amazon BR und B2W) ermöglicht. Das Unternehmen wurde 2021 mit 1,5 Mrd. USD bewertet und zählt damit zu den größten brasilianischen E-Commerce-Startups.
 
-Ziel des Projekts ist der Aufbau einer produktionsnahen Analytics Platform auf Basis eines SQL Server Data Warehouse — von der Quelldatenaufnahme über mehrstufige Transformation und Modellierung bis zum analytischen Reporting. Implementiert werden etablierte DWH-Patterns: Metadata-Driven Orchestrierung, Batch-Historisierung, inkrementelles Ladekonzept mit SHA-256 Change Detection, Datenqualitätsprüfung, Soft Delete und transaktionssichere Stored Procedures. Als Reporting-Layer rundet ein 4-seitiges Power BI Dashboard auf dem Star-Schema im Mart die Architektur ab.
+Ziel des Projekts ist der Aufbau einer produktionsnahen Analytics Platform auf Basis eines SQL Server Data Warehouse, von der Quelldatenaufnahme über mehrstufige Transformation und Modellierung bis zum analytischen Reporting. Implementiert werden etablierte DWH-Patterns: Metadata-Driven Orchestrierung, Batch-Historisierung, inkrementelles Ladekonzept mit SHA-256 Change Detection, Datenqualitätsprüfung, Soft Delete und transaktionssichere Stored Procedures. Als Reporting-Layer rundet ein 4-seitiges Power BI Dashboard auf dem Star-Schema im Mart die Architektur ab.
 
 ---
 
@@ -16,10 +16,10 @@ Ziel des Projekts ist der Aufbau einer produktionsnahen Analytics Platform auf B
 
 | Schema          | Inhalt                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `audit`         | `load_log`, `error_log`, `dq_log`, `job_log` — vollständiger Audit-Trail jedes Ladevorgangs                              |
+| `audit`         | `load_log`, `error_log`, `dq_log`, `job_log`: vollständiger Audit-Trail jedes Ladevorgangs                              |
 | `orchestration` | `pipeline_config` (Metadata Framework), `sp_run_layer`, `sp_run_full_load`, `agent_job_full_load` (SQL Server Agent Job) |
 
-### Mart — Star-Schema (ERD)
+### Mart: Star-Schema (ERD)
 
 ```mermaid
 erDiagram
@@ -135,21 +135,23 @@ erDiagram
 
 ## Power BI Dashboard
 
+Das 4-seitige Dashboard deckt die zentralen analytischen Domänen der Plattform ab: Gesamtkennzahlen, Produkt- und Vertriebsanalyse, Lieferperformance sowie Kunden- und Zahlungsverhalten. Jede Seite enthält KPI-Cards mit MoM-Delta, themenspezifische Trendanalysen und einen gemeinsamen Filterbereich (Jahr, Monat, Bundesstaat, Produktkategorie).
+
 > **Hinweis:** Der Report ist auf den Zeitraum Januar 2017 – August 2018 eingeschränkt. Sep–Dez 2016 (Ramp-up, sehr geringes Volumen) und Sep 2018 (unvollständiger Abschlussmonat) sind aus den Visualisierungen ausgeblendet. Die zugrundeliegenden Mart-Tabellen enthalten den vollen Datensatz 2016–2018.
 
-### Page 1 — Executive Overview
+### Page 1: Executive Overview
 
 ![Executive Overview](docs/images/dashboard/page1_executive_overview.png)
 
-### Page 2 — Sales & Product
+### Page 2: Sales & Product
 
 ![Sales & Product](docs/images/dashboard/page2_sales_and_product.png)
 
-### Page 3 — Delivery & Operations
+### Page 3: Delivery & Operations
 
 ![Delivery & Operations](docs/images/dashboard/page3_delivery_and_operations.png)
 
-### Page 4 — Customer & Payments
+### Page 4: Customer & Payments
 
 ![Customer & Payments](docs/images/dashboard/page4_customer_and_payments.png)
 
@@ -159,31 +161,43 @@ DAX Measures: [`powerbi/te_create_measures.csx`](powerbi/te_create_measures.csx)
 
 ## Data Warehouse Pipeline-Design
 
-### Preprocessing — CSV-Konvertierung
+Die Pipeline ist auf drei Kernziele ausgelegt: **Robustheit** (transaktionssicheres Laden ohne Datenverlust), **Rückverfolgbarkeit** (vollständiger Audit-Trail über alle Layer) und **Effizienz** (inkrementelles Ladekonzept, das nur geänderte Daten verarbeitet). Jeder Layer erfüllt eine klar abgegrenzte Aufgabe: von der Rohdatenaufnahme über die qualitätsgesicherte Bereinigung bis zum analytisch optimierten Star Schema.
 
-Einige Quelldateien enthalten in Feldern eingebettete Kommas oder Zeilenumbrüche (z.B. Geodaten, Bewertungstexte), die `BULK INSERT` auf SQL Server on-premises nicht korrekt verarbeiten kann (`IID_IColumnsInfo` OLE DB-Einschränkung). Für diese Dateien führt `preprocess_all.ps1` vor dem RAW-Load eine Konvertierung durch: comma-delimited mit gequoteten Feldern -> pipe-delimited ohne Quoting.
+### Preprocessing: Quelldatenvorbereitung
 
-Welche Pipelines vorverarbeitet werden, steuert die Spalte `needs_preprocessing = 1` in `orchestration.pipeline_config`. Das Preprocessing wird nur ausgeführt, wenn die Quelldatei seit dem letzten erfolgreichen RAW-Load geändert wurde (`LastWriteTimeUtc > last_success_ts` aus `audit.load_log`). Unveränderte Dateien werden übersprungen. Die Ausgabedateien werden bei jedem Lauf überschrieben — es findet keine Akkumulation statt.
+Bevor Quelldateien in den RAW-Layer geladen werden, normalisiert `preprocess_all.ps1` Dateien mit eingebetteten Trennzeichen (z.B. Kommas in Freitextfeldern, Zeilenumbrüche in Bewertungstexten): Konvertierung von comma-delimited zu pipe-delimited. Das Preprocessing greift nur für Dateien mit `needs_preprocessing = 1` in `orchestration.pipeline_config` und wird ausschließlich ausgeführt, wenn sich die Quelldatei seit dem letzten erfolgreichen Load geändert hat (`LastWriteTimeUtc > last_success_ts`); unveränderte Dateien werden übersprungen.
 
-### Raw — Append-Only Staging mit Batch-Historisierung
+### Raw: Unveränderliche Rohdatenhistorie
 
-Jeder Load erhält eine eindeutige `batch_id` (GUID), die allen Zeilen des Batches zugewiesen wird. Die raw-Tabellen wachsen mit jedem Load — Historisierung auf Batch-Ebene ist damit vollständig gewährleistet. Non-Clustered Indexes auf `batch_id` stellen sicher, dass der `WHERE batch_id = @batch_id`-Filter in den CLEANSED-SPs als Index Seek ausgeführt wird.
+Der RAW-Layer dient als unveränderliches Abbild der Quelldaten. Jeder Load erhält eine eindeutige `batch_id` (GUID), die allen Zeilen des Batches zugewiesen wird. Die Tabellen wachsen append-only, jeder Ladestand ist vollständig rekonstruierbar. Non-Clustered Indexes auf `batch_id` stellen sicher, dass der `WHERE batch_id = @batch_id`-Filter in nachgelagerten SPs als Index Seek ausgeführt wird; die Cleansed-SPs lesen ausschließlich die Zeilen des aktuellen Batches aus der RAW-Tabelle, nicht die gesamte wachsende Historie.
 
-### Cleansed — Inkrementelles Ladekonzept mit DQ-Checks
+### Cleansed: Qualitätsgesicherte, inkrementelle Bereinigung
 
-Der CLEANSED-Layer liest aus RAW über die `batch_id` des letzten erfolgreichen RAW-Loads. Das MERGE-Statement erkennt Änderungen über einen SHA2-256-Hash aller fachlichen Spalten:
+Der CLEANSED-Layer übernimmt Bereinigung, Validierung und Änderungserkennung. Vor jedem MERGE läuft eine CTE-basierte Datenqualitätsprüfung über drei Dimensionen, deren Ergebnisse aggregiert in `audit.dq_log` geschrieben werden:
+
+| Dimension        | Prüfungen                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Completeness** | NULL-Werte, leere Strings nach Bereinigung                                                                                                       |
+| **Validity**     | Länge, Format (Hex-IDs, numerische Felder, Datumsformat), Wertemenge (z.B. `payment_type`), logische Konsistenz (z.B. Lieferdatum vor Kaufdatum) |
+| **Uniqueness**   | Duplikate auf dem natürlichen Schlüssel innerhalb eines Batches                                                                                      |
+
+Duplikate auf dem natürlichen Schlüssel werden in zwei Typen unterschieden: **Type A** (identischer Inhalt unter gleichem Key) wird geloggt und durch `ROW_NUMBER()` dedupliziert, löst aber keinen Abbruch aus, da es sich um eine strukturelle Eigenschaft des Quelldatensatzes handelt (z.B. mehrere Koordinatenpaare pro `zip_code_prefix`) und die Selektion deterministisch erfolgt. **Type B** (widersprüchlicher Inhalt unter gleichem Key) bricht den MERGE mit einem expliziten `THROW` ab, da eine eindeutige Auflösung nicht möglich ist.
+
+Änderungserkennung erfolgt über einen SHA2-256-Hash aller fachlichen Spalten:
 
 ```sql
 HASHBYTES('SHA2_256', CONCAT(col1, '|', col2, '|', ...)) AS row_hash
 ```
 
-Zeilen, die im aktuellen Batch nicht mehr vorkommen, werden **soft-deleted** (`is_deleted = 1`, `deleted_at`) statt physisch gelöscht — der Audit-Trail und Mart-FK-Referenzen bleiben intakt. Wiederauftauchende Datensätze werden automatisch reaktiviert.
+Der Hash wird beim Load für jede Zeile berechnet und im MERGE mit dem gespeicherten `row_hash` der Cleansed-Tabelle verglichen. Stimmen die Hashes überein, wird die Zeile übersprungen; weichen sie ab, wird ein UPDATE durchgeführt: Die fachlichen Spalten in der Cleansed-Tabelle werden mit den neuen Werten aus RAW überschrieben und der gespeicherte `row_hash` aktualisiert. Das Pipe-Trennzeichen verhindert, dass unterschiedliche Spaltenwert-Kombinationen denselben Hash erzeugen (z.B. `"AB" + "C"` vs. `"A" + "BC"` würden ohne Trennzeichen identisch konkateniert).
 
-### Mart — Star-Schema mit Full-Reload und SCD Type 1
+Zeilen, die im aktuellen Batch nicht mehr vorkommen, werden soft-deleted (`is_deleted = 1`) statt physisch entfernt. Eine physische Löschung würde FK-Referenzen aus dem Mart invalidieren und den Audit-Trail unterbrechen; durch Soft Delete bleiben Dimensionsschlüssel im Mart gültig und jeder vergangene Ladezustand bleibt rekonstruierbar. Wiederauftauchende Datensätze werden automatisch reaktiviert.
 
-Der MART-Layer implementiert ein Kimball-Stern-Schema mit 6 Dimensionen und 2 Faktentabellen.
+### Mart: Analytisch optimiertes Star Schema
 
-**Dimensionen** werden über SCD Type 1 MERGE geladen — Änderungen überschreiben den bestehenden Wert, keine Historisierung:
+Der MART-Layer stellt das auswertungsbereite Datenmodell bereit: ein Kimball Star Schema mit 6 Dimensionen und 2 Faktentabellen, das direkt als Datenquelle für das Power BI Dashboard dient.
+
+**Dimensionen** werden über SCD Type 1 MERGE geladen. Änderungen überschreiben den bestehenden Wert ohne Historisierung:
 
 | Dimension             | Typ                  | Besonderheit                                             |
 | --------------------- | -------------------- | -------------------------------------------------------- |
@@ -194,31 +208,15 @@ Der MART-Layer implementiert ein Kimball-Stern-Schema mit 6 Dimensionen und 2 Fa
 | `dim_payment_type`    | INSERT (WHERE NOT EXISTS) | Fixer Wertevorrat (5 Typen), idempotent geseedet   |
 | `dim_order_status`    | INSERT (WHERE NOT EXISTS) | Fixer Wertevorrat (8 Status), idempotent geseedet  |
 
-**Faktentabellen** werden bei jedem Lauf vollständig neu geladen (TRUNCATE + INSERT) — die Quelldaten sind unveränderlich (abgeschlossene Orders), ein inkrementelles Ladekonzept wäre Overhead ohne Mehrwert.
-
-Für nicht auflösbare FK-Referenzen greifen Sentinel-Werte: `-1` (Unknown Member) für Dimensionsschlüssel, `0` für Datumsschlüssel. Non-Clustered Columnstore Indexes auf beiden Faktentabellen optimieren analytische Abfragen.
-
-Die Mart-SPs erhalten keine `batch_id` — die Rückverfolgbarkeit über Layer-Grenzen erfolgt ausschließlich über `job_run_id`.
-
-### Datenqualitätsprüfung
-
-Vor jedem MERGE im Cleansed-Layer läuft eine CTE-basierte DQ-Prüfung über drei Dimensionen:
-
-| Dimension        | Prüfungen                                                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Completeness** | NULL-Werte, leere Strings nach Bereinigung                                                                                                       |
-| **Validity**     | Länge, Format (Hex-IDs, numerische Felder, Datumsformat), Wertemenge (z.B. `payment_type`), logische Konsistenz (z.B. Lieferdatum vor Kaufdatum) |
-| **Uniqueness**   | Duplikate des Primärschlüssels innerhalb eines Batches                                                                                           |
-
-Ergebnisse werden aggregiert in `audit.dq_log` geschrieben — eine Zeile pro `(column_name, issue)`-Kategorie mit `affected_row_count`. Bei strukturellen Duplikaten (eindeutiger PK verletzt) wird der MERGE mit einem expliziten `THROW` abgebrochen. Bekannte Quelldaten-Duplikate (z.B. `review_id`) werden geloggt und durch `ROW_NUMBER()` dedupliziert, lösen aber keinen Abbruch aus.
+**Faktentabellen** werden bei jedem Lauf vollständig neu geladen (TRUNCATE + INSERT), da die Quelldaten unveränderliche, abgeschlossene Orders repräsentieren; ein inkrementelles Ladekonzept wäre Overhead ohne Mehrwert. Non-Clustered Columnstore Indexes auf beiden Faktentabellen optimieren analytische Abfragen; nicht auflösbare FK-Referenzen werden über Sentinel-Werte (`-1` / `0`) abgesichert.
 
 ### Transaktionsmanagement
 
-RUNNING-Eintrag und DQ-Log werden **außerhalb** der Transaktion geschrieben — sie überleben einen Rollback und bleiben für die Fehlerdiagnose querybar. MERGE + SUCCESS-Update laufen **innerhalb** einer expliziten Transaktion und committen atomar.
+MERGE und SUCCESS-Update laufen innerhalb einer expliziten Transaktion und committen atomar. Status-Einträge und DQ-Log werden bewusst außerhalb der Transaktion geschrieben. Sie überleben einen Rollback und bleiben für die Fehlerdiagnose querybar.
 
 ### Metadata-Driven Orchestrierung
 
-Der Kern der Orchestrierung ist die Tabelle `orchestration.pipeline_config` — ein Metadata Framework, das alle ETL-Pipelines zentral konfiguriert und steuert:
+Alle ETL-Pipelines werden zentral über `orchestration.pipeline_config` gesteuert, einem Metadata Framework, das Konfiguration und Ausführungslogik vollständig trennt. Neue Entitäten erfordern ausschließlich einen neuen Konfigurationseintrag, ohne Änderung an der Orchestrierungslogik.
 
 ```
 pipeline_config
@@ -231,20 +229,13 @@ pipeline_config
 └── last_run_status / last_batch_id -> Laufzeitstatus, wird nach jedem Load aktualisiert
 ```
 
-Die Orchestrierungs-SPs lesen ausschließlich aus dieser Tabelle — neue Entities erfordern nur einen neuen `pipeline_config`-Eintrag, keine Änderung an der Orchestrierungslogik.
-
-Das Seeding erfolgt über `dev_pipeline_config.sql` — in einer produktiven Umgebung würde jede Stage (DEV/TEST/PROD) auf einer eigenen SQL Server Instanz laufen und das jeweils passende Seed-Script gegen diese Instanz ausgeführt.
-
-- `orchestration.sp_run_full_load` — startet einen vollständigen Lauf über alle Layer, schreibt in `audit.job_log`
-- `orchestration.sp_run_layer` — iteriert über alle aktiven Pipelines eines Layers (Cursor, `load_sequence`-Reihenfolge)
-
-Der SQL Server Agent Job (`agent_job_full_load.sql`) enthält zwei Steps: Preprocessing via `preprocess_all.ps1` (CmdExec) gefolgt von `sp_run_full_load` (T-SQL). Ermöglicht automatisiertes Scheduling ohne manuellen Eingriff.
+`sp_run_full_load` startet einen vollständigen Lauf über alle Layer; `sp_run_layer` iteriert über alle aktiven Pipelines eines Layers in definierter Reihenfolge. Der SQL Server Agent Job automatisiert die Ausführung: Preprocessing (CmdExec) gefolgt von `sp_run_full_load` (T-SQL). Kein manueller Eingriff erforderlich.
 
 ---
 
 ## Datenbasis
 
-**Quelle:** [Olist Brazilian E-Commerce – Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
+**Quelle:** [Olist Brazilian E-Commerce (Kaggle)](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 
 | Datei                                   | Inhalt                             |
 | --------------------------------------- | ---------------------------------- |
@@ -256,7 +247,7 @@ Der SQL Server Agent Job (`agent_job_full_load.sql`) enthält zwei Steps: Prepro
 | `olist_products_dataset.csv`            | Produktstammdaten                  |
 | `olist_sellers_dataset.csv`             | Verkäuferstammdaten                |
 | `olist_geolocation_dataset.csv`         | PLZ-Geodaten                       |
-| `product_category_name_translation.csv` | Kategorie-Übersetzungen (PT -> EN) |
+| `product_category_name_translation.csv` | Kategorie-Übersetzungen (PT → EN)  |
 
 ---
 
@@ -345,19 +336,19 @@ olist-ecommerce-dwh/
 
 ---
 
-## Status
+## Projektumfang
 
-| Komponente                                               | Status         |
-| -------------------------------------------------------- | -------------- |
-| Schemas & Audit-Tabellen                                 | Abgeschlossen  |
-| Orchestrierung (pipeline_config, Agent Job)              | Abgeschlossen  |
-| RAW-Layer: Stored Procedures und EDAs (alle 9 Entitäten) | Abgeschlossen  |
-| CLEANSED-Layer: alle 9 Entitäten                         | Abgeschlossen  |
-| MART-Layer: 6 Dimensionen, 2 Faktentabellen              | Abgeschlossen  |
-| Power BI Reporting — Seite 1 (Executive Overview)        | Abgeschlossen  |
-| Power BI Reporting — Seite 2 (Sales & Product)           | Abgeschlossen  |
-| Power BI Reporting — Seite 3 (Delivery & Operations)     | Abgeschlossen  |
-| Power BI Reporting — Seite 4 (Customer & Payments)       | Abgeschlossen  |
+| Komponente                                               |
+| -------------------------------------------------------- |
+| Schemas & Audit-Tabellen                                 |
+| Orchestrierung (pipeline_config, Agent Job)              |
+| RAW-Layer: Stored Procedures und EDAs (alle 9 Entitäten) |
+| CLEANSED-Layer: alle 9 Entitäten                         |
+| MART-Layer: 6 Dimensionen, 2 Faktentabellen              |
+| Power BI Reporting: Seite 1 (Executive Overview)         |
+| Power BI Reporting: Seite 2 (Sales & Product)            |
+| Power BI Reporting: Seite 3 (Delivery & Operations)      |
+| Power BI Reporting: Seite 4 (Customer & Payments)        |
 
 ---
 
